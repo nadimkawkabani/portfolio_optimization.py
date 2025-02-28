@@ -59,7 +59,8 @@ cov_mat = returns.cov().values
 weights = cp.Variable(n_assets)
 gamma_par = cp.Parameter(nonneg=True)
 
-portf_rtn_cvx = avg_returns @ weights
+# Use cvxpy's matmul for matrix multiplication
+portf_rtn_cvx = cp.matmul(avg_returns, weights)
 portf_vol_cvx = cp.quad_form(weights, cov_mat)
 
 objective_function = cp.Maximize(portf_rtn_cvx - gamma_par * portf_vol_cvx)
