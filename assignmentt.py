@@ -1,160 +1,147 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-import seaborn as sns
 import yfinance as yf
 import numpy as np
 import pandas as pd
 import quantstats as qs
+import matplotlib.pyplot as plt
+import seaborn as sns
 import cvxpy as cp
 
-# Set Seaborn theme
+# Set up the theme and figure size
 sns.set_theme(context="talk", style="whitegrid", palette="colorblind", color_codes=True, rc={"figure.figsize": [12, 8]})
 
-# Define 20 diversified assets across various industries
+# Define the list of assets
 ASSETS = [
     "MSFT", "AAPL", "GOOGL", "AMZN", "META",    # Technology
     "NFLX", "ADSK", "INTC", "NVDA", "TSM",      # Semiconductors & Tech
     "JPM", "GS", "BAC", "C", "AXP",            # Finance
     "UNH", "LLY", "PFE", "BMY", "MRK"          # Healthcare
 ]
+n_assets = len(ASSETS)
 
-# Streamlit configuration
-st.set_page_config(page_title="Portfolio Optimization", layout="wide")
-
-# Streamlit Title
+# Streamlit app title
 st.title("Portfolio Optimization")
 
-# Sidebar for filters
-st.sidebar.header("Filters")
-
-# Filter for Asset Selection
-selected_assets = st.sidebar.multiselect(
-    "Select Assets",
-    ASSETS,
-    default=ASSETS  # Default to all assets
-)
-
-# Filter for Date Range
+# Streamlit Sidebar for asset selection
+selected_assets = st.sidebar.multiselect('Select Assets', ASSETS, default=ASSETS)
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2017-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2023-12-31"))
 
-# Download the data
+# Download the asset price data from Yahoo Finance
 prices_df = yf.download(selected_assets, start=start_date, end=end_date)
 
-# Ensure the data is downloaded correctly
-if prices_df.empty:
-    st.write("Data could not be fetched. Please check the selected assets and date range.")
-else:
-    # Show the last few rows of the data
-    st.write(f"Downloaded data for {len(selected_assets)} assets from {start_date} to {end_date}")
-    st.write(prices_df.tail())
+# Show the selected asset prices
+st.subheader("Asset Prices")
+fig, ax = plt.subplots()
+prices_df["Close"].plot(ax=ax, title="Selected Assets Prices")
+ax.legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Place legend on the far right
+st.pyplot(fig)
 
-    # Plot the asset prices
-    st.subheader("Asset Prices Over Time")
-    fig, ax = plt.subplots()
-    prices_df["Close"].plot(ax=ax)
-    ax.set(title="Asset Prices Over Time", xlabel="Date", ylabel="Price (USD)")
-    sns.despine()
-    ax.legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Legend on the far right
-    st.pyplot(fig)
+# Calculate the returns of the selected assets
+returns = prices_df["Close"].pct_change().dropna()
 
-    # Compute returns for portfolio performance
-    returns = prices_df["Close"].pct_change().dropna()
-    portfolio_weights = len(selected_assets) * [1 / len(selected_assets)]
-    portfolio_returns = pd.Series(
-        np.dot(portfolio_weights, returns.T),
-        index=returns.index
-    )
+# Portfolio weights (equally distributed for the 1/n portfolio)
+portfolio_weights = np.array([1 / len(selected_assets)] * len(selected_assets))
 
-    # Portfolio performance plot
-    st.subheader("Portfolio Performance (1/n Portfolio)")
-    fig, ax = plt.subplots()
-    qs.plots.snapshot(portfolio_returns, title="1/n Portfolio's Performance", grayscale=True, ax=ax)
-    ax.legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Legend on the far right
-    st.pyplot(fig)
+# Compute portfolio returns
+portfolio_returns = pd.Series(np.dot(returns, portfolio_weights), index=returns.index)
 
-    # Efficient Frontier Plot
-    st.subheader("Efficient Frontier")
+# Display Portfolio Performance for the 1/n Portfolio
+st.subheader("Portfolio Performance (1/n Portfolio)")
+fig, ax = plt.subplots()
+qs.plots.snapshot(portfolio_returns, title="1/n Portfolio's Performance", grayscale=True, ax=ax)
+ax.legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Place legend on the far right
+st.pyplot(fig)
 
-    # Optimization setup for efficient frontier
-    avg_returns = returns.mean().values
-    cov_mat = returns.cov().values
-    n_assets = len(selected_assets)
-    
-    weights = cp.Variable(n_assets)
-    gamma_par = cp.Parameter(nonneg=True)
-    portf_rtn_cvx = avg_returns @ weights
-    portf_vol_cvx = cp.quad_form(weights, cov_mat)
-    
-    objective_function = cp.Maximize(portf_rtn_cvx - gamma_par * portf_vol_cvx)
-    problem = cp.Problem(objective_function, [cp.sum(weights) == 1, weights >= 0])
-    
-    N_POINTS = 25
-    portf_rtn_cvx_ef = []
-    portf_vol_cvx_ef = []
-    
-    gamma_range = np.logspace(-3, 3, num=N_POINTS)
-    
-    for gamma in gamma_range:
-        gamma_par.value = gamma
-        problem.solve()
-        portf_vol_cvx_ef.append(np.sqrt(portf_vol_cvx).value)
-        portf_rtn_cvx_ef.append(portf_rtn_cvx.value)
-    
-    # Plot the efficient frontier
-    fig, ax = plt.subplots()
-    ax.plot(portf_vol_cvx_ef, portf_rtn_cvx_ef, "g-", label="Efficient Frontier")
-    ax.set(title="Efficient Frontier", xlabel="Volatility", ylabel="Expected Returns")
-    ax.legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Legend on the far right
-    sns.despine()
-    st.pyplot(fig)
+# Efficient Frontier Calculation
+avg_returns = returns.mean().values
+cov_mat = returns.cov().values
+weights = cp.Variable(n_assets)
+gamma_par = cp.Parameter(nonneg=True)
 
-    # Leverage Efficient Frontier
-    st.subheader("Efficient Frontier with Leverage")
+portf_rtn_cvx = avg_returns @ weights
+portf_vol_cvx = cp.quad_form(weights, cov_mat)
 
-    # Leverage setup
-    max_leverage = cp.Parameter()
-    prob_with_leverage = cp.Problem(objective_function, [cp.sum(weights) == 1, cp.norm(weights, 1) <= max_leverage])
+objective_function = cp.Maximize(portf_rtn_cvx - gamma_par * portf_vol_cvx)
 
-    LEVERAGE_RANGE = [1, 2, 5]
-    len_leverage = len(LEVERAGE_RANGE)
-    portf_vol_l = np.zeros((N_POINTS, len_leverage))
-    portf_rtn_l = np.zeros((N_POINTS, len_leverage))
-    weights_ef = np.zeros((len_leverage, N_POINTS, n_assets))
+problem = cp.Problem(objective_function, [cp.sum(weights) == 1, weights >= 0])
 
-    for lev_ind, leverage in enumerate(LEVERAGE_RANGE):
-        for gamma_ind in range(N_POINTS):
-            max_leverage.value = leverage
-            gamma_par.value = gamma_range[gamma_ind]
-            prob_with_leverage.solve()
-            portf_vol_l[gamma_ind, lev_ind] = np.sqrt(portf_vol_cvx).value
-            portf_rtn_l[gamma_ind, lev_ind] = portf_rtn_cvx.value
-            weights_ef[lev_ind, gamma_ind, :] = weights.value
-    
-    # Plot leverage efficient frontier
-    fig, ax = plt.subplots()
-    for leverage_index, leverage in enumerate(LEVERAGE_RANGE):
-        plt.plot(portf_vol_l[:, leverage_index], portf_rtn_l[:, leverage_index], label=f"Leverage {leverage}")
+# Generate Efficient Frontier for varying risk aversion
+N_POINTS = 25
+portf_rtn_cvx_ef = []
+portf_vol_cvx_ef = []
+gamma_range = np.logspace(-3, 3, num=N_POINTS)
 
-    ax.set(title="Efficient Frontier for Different Max Leverage", xlabel="Volatility", ylabel="Expected Returns")
-    ax.legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Legend on the far right
-    sns.despine()
-    st.pyplot(fig)
+for gamma in gamma_range:
+    gamma_par.value = gamma
+    problem.solve()
+    portf_vol_cvx_ef.append(cp.sqrt(portf_vol_cvx).value)
+    portf_rtn_cvx_ef.append(portf_rtn_cvx.value)
 
-    # Weights Allocation per Leverage
-    st.subheader("Weights Allocation per Leverage")
+# Plot the Efficient Frontier
+st.subheader("Efficient Frontier")
+fig, ax = plt.subplots()
+ax.plot(portf_vol_cvx_ef, portf_rtn_cvx_ef, "g-")
+ax.set(title="Efficient Frontier", xlabel="Volatility", ylabel="Expected Returns")
 
-    fig, ax = plt.subplots(len_leverage, 1, sharex=True)
+# Display asset points on the Efficient Frontier
+MARKERS = ["o", "X", "d", "*"]
+for asset_index in range(n_assets):
+    ax.scatter(x=np.sqrt(cov_mat[asset_index, asset_index]),
+               y=avg_returns[asset_index],
+               marker=MARKERS[asset_index % len(MARKERS)],  # Use modulo to avoid IndexError
+               label=selected_assets[asset_index],
+               s=150)
 
-    for ax_index in range(len_leverage):
-        weights_df = pd.DataFrame(weights_ef[ax_index], columns=selected_assets, index=np.round(gamma_range, 3))
-        weights_df.plot(kind="bar", stacked=True, ax=ax[ax_index], legend=None)
-        ax[ax_index].set(ylabel=(f"Max Leverage = {LEVERAGE_RANGE[ax_index]}\nWeight"))
+ax.legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Place legend on the far right
+sns.despine()
+plt.tight_layout()
+st.pyplot(fig)
 
-    ax[len_leverage - 1].set(xlabel=r"$\gamma$")
-    ax[0].legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Legend on the far right
-    ax[0].set_title("Weights Allocation per Risk-Aversion Level", fontsize=16)
+# Leverage Constraints and Efficient Frontier Calculation for different max leverage
+max_leverage = cp.Parameter()
+prob_with_leverage = cp.Problem(objective_function, [cp.sum(weights) == 1, cp.norm(weights, 1) <= max_leverage])
+LEVERAGE_RANGE = [1, 2, 5]
+len_leverage = len(LEVERAGE_RANGE)
 
-    sns.despine()
-    plt.tight_layout()
-    st.pyplot(fig)
+portf_vol_l = np.zeros((N_POINTS, len_leverage))
+portf_rtn_l = np.zeros((N_POINTS, len_leverage))
+weights_ef = np.zeros((len_leverage, N_POINTS, n_assets))
+
+for lev_ind, leverage in enumerate(LEVERAGE_RANGE):
+    for gamma_ind in range(N_POINTS):
+        max_leverage.value = leverage
+        gamma_par.value = gamma_range[gamma_ind]
+        prob_with_leverage.solve()
+        portf_vol_l[gamma_ind, lev_ind] = cp.sqrt(portf_vol_cvx).value
+        portf_rtn_l[gamma_ind, lev_ind] = portf_rtn_cvx.value
+        weights_ef[lev_ind, gamma_ind, :] = weights.value
+
+# Plot the Efficient Frontier for different max leverage
+st.subheader("Efficient Frontier with Leverage")
+fig, ax = plt.subplots()
+
+for leverage_index, leverage in enumerate(LEVERAGE_RANGE):
+    ax.plot(portf_vol_l[:, leverage_index], portf_rtn_l[:, leverage_index], label=f"Max Leverage = {leverage}")
+
+ax.set(title="Efficient Frontier for Different Max Leverage", xlabel="Volatility", ylabel="Expected Returns")
+ax.legend(title="Max Leverage", bbox_to_anchor=(1.05, 0.5), loc='center left')  # Place legend on the far right
+sns.despine()
+plt.tight_layout()
+st.pyplot(fig)
+
+# Plot the weights for different levels of risk-aversion (gamma) and leverage
+fig, ax = plt.subplots(len_leverage, 1, sharex=True)
+
+for ax_index in range(len_leverage):
+    weights_df = pd.DataFrame(weights_ef[ax_index], columns=selected_assets, index=np.round(gamma_range, 3))
+    weights_df.plot(kind="bar", stacked=True, ax=ax[ax_index], legend=None)
+    ax[ax_index].set(ylabel=f"Max Leverage = {LEVERAGE_RANGE[ax_index]}\nWeight")
+
+ax[len_leverage - 1].set(xlabel=r"$\gamma$")
+ax[0].legend(bbox_to_anchor=(1.05, 0.5), loc='center left')  # Place legend on the far right
+ax[0].set_title("Weights Allocation per Risk-Aversion Level", fontsize=16)
+
+sns.despine()
+plt.tight_layout()
+st.pyplot(fig)
