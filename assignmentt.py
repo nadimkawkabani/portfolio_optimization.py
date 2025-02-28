@@ -23,30 +23,31 @@ ASSETS = [
     "UNH", "LLY", "PFE", "BMY", "MRK"          # Healthcare
 ]
 
-n_assets = len(ASSETS)
-
 # Streamlit configuration
 st.set_page_config(page_title="Portfolio Optimization", layout="wide")
 
 # Streamlit Title
 st.title("Portfolio Optimization")
 
+# Sidebar for filters
+st.sidebar.header("Filters")
+
 # Filter for Asset Selection
-selected_assets = st.multiselect(
+selected_assets = st.sidebar.multiselect(
     "Select Assets",
     ASSETS,
     default=ASSETS  # Default to all assets
 )
 
 # Filter for Date Range
-start_date = st.date_input("Start Date", value=pd.to_datetime("2017-01-01"))
-end_date = st.date_input("End Date", value=pd.to_datetime("2023-12-31"))
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2017-01-01"))
+end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2023-12-31"))
 
 # Filter for Gamma (Risk Aversion)
-gamma_value = st.slider("Risk Aversion (Gamma)", min_value=0.001, max_value=100.0, value=0.1, step=0.001)
+gamma_value = st.sidebar.slider("Risk Aversion (Gamma)", min_value=0.001, max_value=100.0, value=0.1, step=0.001)
 
 # Filter for Leverage Levels
-max_leverage_value = st.slider("Max Leverage", min_value=1, max_value=5, value=1, step=1)
+max_leverage_value = st.sidebar.slider("Max Leverage", min_value=1, max_value=5, value=1, step=1)
 
 # Download the data
 prices_df = yf.download(selected_assets, start=start_date, end=end_date)
@@ -56,10 +57,13 @@ returns = prices_df["Close"].pct_change().dropna()
 portfolio_weights = len(selected_assets) * [1 / len(selected_assets)]
 portfolio_returns = pd.Series(np.dot(portfolio_weights, returns.T), index=returns.index)
 
-# Plot portfolio performance
+# Plot portfolio performance (first graph)
+st.subheader("1/n Portfolio Performance")
 qs.plots.snapshot(portfolio_returns, title="1/n portfolio's performance", grayscale=True)
+st.pyplot()
 
-# Display portfolio metrics
+# Display portfolio metrics (second graph)
+st.subheader("Portfolio Metrics")
 qs.reports.metrics(portfolio_returns, benchmark="SPY", mode="basic")
 
 # Optimization
@@ -89,7 +93,8 @@ for gamma in gamma_range:
 
 weights_df = pd.DataFrame(weights_ef, columns=selected_assets, index=np.round(gamma_range, 3))
 
-# Plot weights allocation
+# Plot weights allocation (third graph)
+st.subheader("Weights Allocation per Risk-Aversion Level")
 fig, ax = plt.subplots()
 weights_df.plot(kind="bar", stacked=True, ax=ax)
 ax.set(title="Weights allocation per risk-aversion level", xlabel=r"$\gamma$", ylabel="Weight")
@@ -97,7 +102,8 @@ ax.legend(bbox_to_anchor=(1, 1))
 sns.despine()
 st.pyplot(fig)
 
-# Plot Efficient Frontier
+# Plot Efficient Frontier (fourth graph)
+st.subheader("Efficient Frontier")
 fig, ax = plt.subplots()
 ax.plot(portf_vol_cvx_ef, portf_rtn_cvx_ef, "g-")
 MARKERS = ["o", "X", "d", "*"]
@@ -112,7 +118,8 @@ ax.legend()
 sns.despine()
 st.pyplot(fig)
 
-# Plot efficient frontier with leverage
+# Plot efficient frontier with leverage (fifth graph)
+st.subheader("Efficient Frontier for Different Max Leverage")
 max_leverage = cp.Parameter()
 prob_with_leverage = cp.Problem(objective_function, [cp.sum(weights) == 1, cp.norm(weights, 1) <= max_leverage])
 LEVERAGE_RANGE = [max_leverage_value]
@@ -139,7 +146,8 @@ ax.legend(title="Max leverage")
 sns.despine()
 st.pyplot(fig)
 
-# Plot weight allocation for different leverage levels
+# Plot weight allocation for different leverage levels (sixth graph)
+st.subheader("Weight Allocation per Risk-Aversion Level for Different Leverage")
 fig, ax = plt.subplots(len_leverage, 1, sharex=True)
 for ax_index in range(len_leverage):
     weights_df = pd.DataFrame(weights_ef[ax_index], columns=selected_assets, index=np.round(gamma_range, 3))
