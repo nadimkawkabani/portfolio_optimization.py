@@ -59,12 +59,15 @@ portfolio_returns = pd.Series(np.dot(portfolio_weights, returns.T), index=return
 
 # Plot portfolio performance (first graph)
 st.subheader("1/n Portfolio Performance")
-qs.plots.snapshot(portfolio_returns, title="1/n portfolio's performance", grayscale=True)
-st.pyplot()
+fig1, ax1 = plt.subplots()
+qs.plots.snapshot(portfolio_returns, title="1/n portfolio's performance", grayscale=True, ax=ax1)
+st.pyplot(fig1)
 
 # Display portfolio metrics (second graph)
 st.subheader("Portfolio Metrics")
+fig2, ax2 = plt.subplots()
 qs.reports.metrics(portfolio_returns, benchmark="SPY", mode="basic")
+st.pyplot(fig2)
 
 # Optimization
 avg_returns = returns.mean().values
@@ -95,28 +98,28 @@ weights_df = pd.DataFrame(weights_ef, columns=selected_assets, index=np.round(ga
 
 # Plot weights allocation (third graph)
 st.subheader("Weights Allocation per Risk-Aversion Level")
-fig, ax = plt.subplots()
-weights_df.plot(kind="bar", stacked=True, ax=ax)
-ax.set(title="Weights allocation per risk-aversion level", xlabel=r"$\gamma$", ylabel="Weight")
-ax.legend(bbox_to_anchor=(1, 1))
+fig3, ax3 = plt.subplots()
+weights_df.plot(kind="bar", stacked=True, ax=ax3)
+ax3.set(title="Weights allocation per risk-aversion level", xlabel=r"$\gamma$", ylabel="Weight")
+ax3.legend(bbox_to_anchor=(1, 1))
 sns.despine()
-st.pyplot(fig)
+st.pyplot(fig3)
 
 # Plot Efficient Frontier (fourth graph)
 st.subheader("Efficient Frontier")
-fig, ax = plt.subplots()
-ax.plot(portf_vol_cvx_ef, portf_rtn_cvx_ef, "g-")
+fig4, ax4 = plt.subplots()
+ax4.plot(portf_vol_cvx_ef, portf_rtn_cvx_ef, "g-")
 MARKERS = ["o", "X", "d", "*"]
 for asset_index in range(len(selected_assets)):
-    ax.scatter(x=np.sqrt(cov_mat[asset_index, asset_index]),
-               y=avg_returns[asset_index],
-               marker=MARKERS[asset_index % len(MARKERS)],
-               label=selected_assets[asset_index],
-               s=150)
-ax.set(title="Efficient Frontier", xlabel="Volatility", ylabel="Expected Returns")
-ax.legend()
+    ax4.scatter(x=np.sqrt(cov_mat[asset_index, asset_index]),
+                y=avg_returns[asset_index],
+                marker=MARKERS[asset_index % len(MARKERS)],
+                label=selected_assets[asset_index],
+                s=150)
+ax4.set(title="Efficient Frontier", xlabel="Volatility", ylabel="Expected Returns")
+ax4.legend()
 sns.despine()
-st.pyplot(fig)
+st.pyplot(fig4)
 
 # Plot efficient frontier with leverage (fifth graph)
 st.subheader("Efficient Frontier for Different Max Leverage")
@@ -138,23 +141,23 @@ for lev_ind, leverage in enumerate(LEVERAGE_RANGE):
         portf_rtn_l[gamma_ind, lev_ind] = portf_rtn_cvx.value
         weights_ef[lev_ind, gamma_ind, :] = weights.value
 
-fig, ax = plt.subplots()
+fig5, ax5 = plt.subplots()
 for leverage_index, leverage in enumerate(LEVERAGE_RANGE):
-    ax.plot(portf_vol_l[:, leverage_index], portf_rtn_l[:, leverage_index], label=f"{leverage}")
-ax.set(title="Efficient Frontier for different max leverage", xlabel="Volatility", ylabel="Expected Returns")
-ax.legend(title="Max leverage")
+    ax5.plot(portf_vol_l[:, leverage_index], portf_rtn_l[:, leverage_index], label=f"{leverage}")
+ax5.set(title="Efficient Frontier for different max leverage", xlabel="Volatility", ylabel="Expected Returns")
+ax5.legend(title="Max leverage")
 sns.despine()
-st.pyplot(fig)
+st.pyplot(fig5)
 
 # Plot weight allocation for different leverage levels (sixth graph)
 st.subheader("Weight Allocation per Risk-Aversion Level for Different Leverage")
-fig, ax = plt.subplots(len_leverage, 1, sharex=True)
+fig6, ax6 = plt.subplots(len_leverage, 1, sharex=True)
 for ax_index in range(len_leverage):
     weights_df = pd.DataFrame(weights_ef[ax_index], columns=selected_assets, index=np.round(gamma_range, 3))
-    weights_df.plot(kind="bar", stacked=True, ax=ax[ax_index], legend=None)
-    ax[ax_index].set(ylabel=(f"max_leverage = {LEVERAGE_RANGE[ax_index]}\n weight"))
-ax[len_leverage - 1].set(xlabel=r"$\gamma$")
-ax[0].legend(bbox_to_anchor=(1, 1))
-ax[0].set_title("Weights allocation per risk-aversion level", fontsize=16)
+    weights_df.plot(kind="bar", stacked=True, ax=ax6[ax_index], legend=None)
+    ax6[ax_index].set(ylabel=(f"max_leverage = {LEVERAGE_RANGE[ax_index]}\n weight"))
+ax6[len_leverage - 1].set(xlabel=r"$\gamma$")
+ax6[0].legend(bbox_to_anchor=(1, 1))
+ax6[0].set_title("Weights allocation per risk-aversion level", fontsize=16)
 sns.despine()
-st.pyplot(fig)
+st.pyplot(fig6)
