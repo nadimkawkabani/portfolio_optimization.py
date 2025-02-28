@@ -7,6 +7,62 @@ import yfinance as yf
 import quantstats as qs
 import cvxpy as cp
 import warnings
+import streamlit as st
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+import yfinance as yf
+
+# Set Seaborn theme
+sns.set_theme(context="talk", style="whitegrid", palette="colorblind", color_codes=True, rc={"figure.figsize": [12, 8]})
+
+# Define 20 diversified assets across various industries
+ASSETS = [
+    "MSFT", "AAPL", "GOOGL", "AMZN", "META",    # Technology
+    "NFLX", "ADSK", "INTC", "NVDA", "TSM",      # Semiconductors & Tech
+    "JPM", "GS", "BAC", "C", "AXP",            # Finance
+    "UNH", "LLY", "PFE", "BMY", "MRK"          # Healthcare
+]
+
+# Streamlit configuration
+st.set_page_config(page_title="Portfolio Optimization", layout="wide")
+
+# Streamlit Title
+st.title("Portfolio Optimization")
+
+# Sidebar for filters
+st.sidebar.header("Filters")
+
+# Filter for Asset Selection
+selected_assets = st.sidebar.multiselect(
+    "Select Assets",
+    ASSETS,
+    default=ASSETS  # Default to all assets
+)
+
+# Filter for Date Range
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2017-01-01"))
+end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2023-12-31"))
+
+# Download the data
+prices_df = yf.download(selected_assets, start=start_date, end=end_date)
+
+# Ensure the data is downloaded correctly
+if prices_df.empty:
+    st.write("Data could not be fetched. Please check the selected assets and date range.")
+else:
+    # Show the last few rows of the data
+    st.write(f"Downloaded data for {len(selected_assets)} assets from {start_date} to {end_date}")
+    st.write(prices_df.tail())
+
+    # Plot the asset prices
+    st.subheader("Asset Prices Over Time")
+    fig, ax = plt.subplots()
+    prices_df["Close"].plot(ax=ax)
+    ax.set(title="Asset Prices Over Time", xlabel="Date", ylabel="Price (USD)")
+    sns.despine()
+    st.pyplot(fig)
 
 # Suppress warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
