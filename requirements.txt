@@ -6,3 +6,4 @@ pandas
 yfinance
 quantstats
 cvxpy
+ipython
