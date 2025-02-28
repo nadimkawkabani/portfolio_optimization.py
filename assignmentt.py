@@ -53,6 +53,10 @@ max_leverage_value = st.sidebar.slider("Max Leverage", min_value=1, max_value=5,
 prices_df = yf.download(selected_assets, start=start_date, end=end_date)
 returns = prices_df["Close"].pct_change().dropna()
 
+# Check if the data was downloaded correctly
+st.write(f"Downloaded data for {len(selected_assets)} assets from {start_date} to {end_date}")
+st.write(prices_df.tail())
+
 # Portfolio weights
 portfolio_weights = len(selected_assets) * [1 / len(selected_assets)]
 portfolio_returns = pd.Series(np.dot(portfolio_weights, returns.T), index=returns.index)
