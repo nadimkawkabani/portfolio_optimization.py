@@ -1,6 +1,45 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
+import warnings
+
+# Suppress warnings
+warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=pd.errors.SettingWithCopyWarning)
+
+# Set Seaborn theme for the plots
+sns.set_theme(context="talk", style="whitegrid", palette="colorblind", color_codes=True, rc={"figure.figsize": [12, 8]})
+
+# Example DataFrame (you can replace this with your own data)
+data = {
+    'Category': ['A', 'B', 'C', 'D', 'E'],
+    'Value': [23, 45, 56, 78, 33]
+}
+df = pd.DataFrame(data)
+
+# Streamlit page configuration
+st.set_page_config(page_title="Data Visualization", layout="wide")
+
+# Streamlit title
+st.title("Streamlit Data Visualization Example")
+
+# Display the DataFrame
+st.write("Here is an example DataFrame:")
+st.dataframe(df)
+
+# Plot using Seaborn
+fig, ax = plt.subplots()
+sns.barplot(x="Category", y="Value", data=df, ax=ax)
+ax.set_title("Bar Plot Example")
+sns.despine()
+
+# Display the plot in Streamlit
+st.pyplot(fig)
+
+import streamlit as st
+import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import pandas as pd
 import yfinance as yf
